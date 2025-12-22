@@ -10,7 +10,7 @@ from lib.rover import Rover
 from telemetry.parsing import parse_pose
 from telemetry.estimation import (
     estimate_velocity,
-    estimate_altitude_from_dvl,
+    parse_depth,
     estimate_motion_state,
     estimate_front_obstacle,
 )
@@ -123,7 +123,7 @@ def main():
             telemetry = {
                 "pose": parse_pose(last.get("Pose")),
                 "velocity": estimate_velocity(last.get("Velocity")),
-                "altitude": estimate_altitude_from_dvl(last.get("DVL")),
+                "altitude": parse_depth(last.get("Depth")),
                 "motion": estimate_motion_state(last.get("IMU")),
                 "front_range": estimate_front_obstacle(last.get("RangeFinder")),
             }
