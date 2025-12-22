@@ -14,25 +14,27 @@ from telemetry.estimation import (
     estimate_motion_state,
 )
 
-from utils.convert import pose_to_csv_fields
-from utils.convert import velocity_to_csv_fields
-
+from utils.convert import pose_to_csv_fields, velocity_to_csv_fields
 from utils.writer import DatasetWriter
 
 
 # ============================
-# CONFIG
+# CONFIG DATASET
 # ============================
 
 DATASET_ROOT = "dataset/runs"
-RUN_ID = "run_0001"
-OBJECT_CLASS = "seafloor"  
-ALTITUDE_M = -60
+OBJECT_CLASS = "seafloor"
+MAP_NAME = "DAM"
 
-SONAR_KEY = "ImagingSonar"
+# profondità iniziali (z negative)
+DEPTHS_M = [60, 55, 50, 45]
+
 FRONT_CAM = "FrontCamera"
 BOTTOM_CAM = "SonarCamera"
-MAP = "DAM"
+SONAR_KEY = "ImagingSonar"
+
+MAX_FRAMES_PER_RUN = 100
+
 
 # ============================
 # TRAJECTORY CONTROLLER
@@ -44,41 +46,58 @@ class ForwardTrajectory:
 
     def command(self):
         cmd = np.zeros(8, dtype=np.float32)
-        cmd[4:] = self.speed
+        cmd[4:] = self.speed  # forward
         return cmd
 
+
+# ============================
+# SENSOR CACHE MAP
+# ============================
 
 SENSOR_MAP = {
     "Pose": "PoseSensor",
     "Velocity": "VelocitySensor",
     "IMU": "IMUSensor",
-    "DVL": "DVLSensor",
-    "RangeFinder": "RangeFinderSensor",
-    "Collision": "CollisionSensor",
+    "Depth": "DepthSensor",
 }
 
 
-def main():
+# ============================
+# SINGLE RUN
+# ============================
+
+def run_single_depth(depth_m: float, run_idx: int):
+
+    run_id = f"run_{run_idx:04d}"
+    print(f"\n🌊 Avvio {run_id} | depth = {depth_m} m")
+
+    # ----------------------------
+    # METADATA
+    # ----------------------------
 
     run_metadata = {
-        "run_id": RUN_ID,
+        "run_id": run_id,
         "primary_object": OBJECT_CLASS,
-        "altitude_m": ALTITUDE_M,
-        "MAP": MAP, 
+        "initial_depth_m": depth_m,
+        "map": MAP_NAME,
         "motion": "forward",
         "notes": "Seafloor-only acquisition"
     }
 
-    run_path = os.path.join(DATASET_ROOT, RUN_ID)
+    run_path = os.path.join(DATASET_ROOT, run_id)
     os.makedirs(run_path, exist_ok=True)
 
     with open(os.path.join(run_path, "run_metadata.yaml"), "w") as f:
         yaml.safe_dump(run_metadata, f)
 
+    # ----------------------------
+    # ROVER + SCENARIO
+    # ----------------------------
+
     rov = Rover.BlueROV2(
         name="rov0",
-        location=[-300, 25, -ALTITUDE_M],
-        rotation=[0, 0, 0],
+        location=[-300, 200, -depth_m],  # z negativa = profondità
+        rotation=[0, 0, -90],
         control_scheme=0,
     )
 
@@ -88,9 +107,13 @@ def main():
         .add_agent(rov)
     )
 
+    # ----------------------------
+    # DATASET WRITER
+    # ----------------------------
+
     writer = DatasetWriter(
         root=DATASET_ROOT,
-        run_id=RUN_ID,
+        run_id=run_id,
         front_cam_key=FRONT_CAM,
         bottom_cam_key=BOTTOM_CAM,
         sonar_key=SONAR_KEY,
@@ -100,7 +123,9 @@ def main():
 
     traj = ForwardTrajectory()
 
-    print("Avvio acquisizione dataset...")
+    # ----------------------------
+    # SIMULATION
+    # ----------------------------
 
     with holoocean.make(
         scenario_cfg=scenario.to_dict(),
@@ -111,30 +136,41 @@ def main():
 
         last = {}
 
-        while True:
+        while writer.frame_id < MAX_FRAMES_PER_RUN:
+
             state = env.step(traj.command())
 
-            for k, v in SENSOR_MAP.items():
-                if v in state:
-                    last[k] = state[v]
+            # cache sensori
+            for key, sensor_name in SENSOR_MAP.items():
+                if sensor_name in state:
+                    last[key] = state[sensor_name]
 
+            # frame valido solo se c'è il sonar
             if SONAR_KEY not in state:
-                continue 
+                continue
 
             telemetry = {
                 "pose": parse_pose(last.get("Pose")),
                 "velocity": estimate_velocity(last.get("Velocity")),
-                "altitude": parse_depth(last.get("Depth")),
+                "altitude": parse_depth(last.get("Depth")),  # in realtà è depth
                 "motion": estimate_motion_state(last.get("IMU")),
             }
 
             writer.write_frame(state, telemetry)
 
-            if writer.frame_id >= 300:
-                break
-
     writer.close()
-    print("Run completata")
+    print(f" {run_id} completata")
+
+
+# ============================
+# MAIN
+# ============================
+
+def main():
+    for idx, depth in enumerate(DEPTHS_M):
+        run_single_depth(depth_m=depth, run_idx=idx)
+
+    print("\nDataset completato")
 
 
 if __name__ == "__main__":
