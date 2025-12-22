@@ -12,7 +12,6 @@ from telemetry.estimation import (
     estimate_velocity,
     parse_depth,
     estimate_motion_state,
-    estimate_front_obstacle,
 )
 
 from utils.convert import pose_to_csv_fields
@@ -28,11 +27,12 @@ from utils.writer import DatasetWriter
 DATASET_ROOT = "dataset/runs"
 RUN_ID = "run_0001"
 OBJECT_CLASS = "seafloor"  
-ALTITUDE_M = 2
+ALTITUDE_M = -60
 
 SONAR_KEY = "ImagingSonar"
 FRONT_CAM = "FrontCamera"
 BOTTOM_CAM = "SonarCamera"
+MAP = "DAM"
 
 # ============================
 # TRAJECTORY CONTROLLER
@@ -64,6 +64,7 @@ def main():
         "run_id": RUN_ID,
         "primary_object": OBJECT_CLASS,
         "altitude_m": ALTITUDE_M,
+        "MAP": MAP, 
         "motion": "forward",
         "notes": "Seafloor-only acquisition"
     }
@@ -76,7 +77,7 @@ def main():
 
     rov = Rover.BlueROV2(
         name="rov0",
-        location=[100, -100, -ALTITUDE_M],
+        location=[-300, 25, -ALTITUDE_M],
         rotation=[0, 0, 0],
         control_scheme=0,
     )
@@ -125,7 +126,6 @@ def main():
                 "velocity": estimate_velocity(last.get("Velocity")),
                 "altitude": parse_depth(last.get("Depth")),
                 "motion": estimate_motion_state(last.get("IMU")),
-                "front_range": estimate_front_obstacle(last.get("RangeFinder")),
             }
 
             writer.write_frame(state, telemetry)
