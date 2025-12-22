@@ -15,8 +15,8 @@ from telemetry.estimation import (
     estimate_front_obstacle,
 )
 
-from src.utils.convert import pose_to_csv_fields
-from src.utils.convert import velocity_to_csv_fields
+from utils.convert import pose_to_csv_fields
+from utils.convert import velocity_to_csv_fields
 
 from utils.writer import DatasetWriter
 
@@ -25,10 +25,10 @@ from utils.writer import DatasetWriter
 # CONFIG
 # ============================
 
-DATASET_ROOT = "../dataset/runs"
+DATASET_ROOT = "dataset/runs"
 RUN_ID = "run_0001"
 OBJECT_CLASS = "seafloor"  
-ALTITUDE_M = 40
+ALTITUDE_M = 2
 
 SONAR_KEY = "ImagingSonar"
 FRONT_CAM = "FrontCamera"
@@ -57,16 +57,6 @@ SENSOR_MAP = {
     "Collision": "CollisionSensor",
 }
 
-writer = DatasetWriter(
-    root=DATASET_ROOT,
-    run_id=RUN_ID,
-    front_cam_key=FRONT_CAM,
-    bottom_cam_key=BOTTOM_CAM,
-    sonar_key=SONAR_KEY,
-    pose_to_csv_fields=pose_to_csv_fields,
-    velocity_to_csv_fields=velocity_to_csv_fields,
-)
-
 
 def main():
 
@@ -86,7 +76,7 @@ def main():
 
     rov = Rover.BlueROV2(
         name="rov0",
-        location=[0, 0, -ALTITUDE_M],
+        location=[100, -100, -ALTITUDE_M],
         rotation=[0, 0, 0],
         control_scheme=0,
     )
@@ -97,7 +87,16 @@ def main():
         .add_agent(rov)
     )
 
-    writer = DatasetWriter(DATASET_ROOT, RUN_ID)
+    writer = DatasetWriter(
+        root=DATASET_ROOT,
+        run_id=RUN_ID,
+        front_cam_key=FRONT_CAM,
+        bottom_cam_key=BOTTOM_CAM,
+        sonar_key=SONAR_KEY,
+        pose_to_csv_fields=pose_to_csv_fields,
+        velocity_to_csv_fields=velocity_to_csv_fields,
+    )
+
     traj = ForwardTrajectory()
 
     print("Avvio acquisizione dataset...")
@@ -120,8 +119,6 @@ def main():
 
             if SONAR_KEY not in state:
                 continue 
-
-            print(last)
 
             telemetry = {
                 "pose": parse_pose(last.get("Pose")),
