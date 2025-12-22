@@ -1,0 +1,48 @@
+sonar_model:
+  name: SurveyorImagingSonar
+  simulator: HoloOcean
+  type: imaging_sonar
+  acquisition_mode: ping_based
+
+geometry:
+  azimuth_fov_deg: 90.0
+  azimuth_bins: 256
+  range_min_m: 1.0
+  range_max_m: 30.0
+  range_bins: 256
+  coordinate_system: polar
+  axes_definition:
+    azimuth: horizontal_angle_deg
+    range: radial_distance_m
+
+data_representation:
+  storage_format: npz
+  matrix_shape: [azimuth_bins, range_bins]
+  value_type: float32
+  value_semantics: echo_intensity
+  normalization: none
+
+noise_model:
+  additive_noise_sigma: 0.1
+  multiplicative_noise_sigma: 0.1
+  range_noise_sigma_m: 0.2
+  approximation_mode: true
+
+timing:
+  frequency_hz: 0.5
+  integration_time_note: >
+    Each sonar frame represents an integrated acoustic response
+    over a single ping interval.
+
+association_policy:
+  master_sensor: imaging_sonar
+  rgb_association: nearest_neighbor
+  max_time_offset_rgb_s: 0.5
+  telemetry_interpolation: linear
+
+intended_use:
+  primary_task:
+    - object_detection
+    - object_classification
+  secondary_task:
+    - sonar_rgb_sensor_fusion

@@ -1,0 +1,85 @@
+platform:
+  name: BlueROV2
+  alias: Spartaco
+  simulator: HoloOcean
+  reference_frame: base_link
+
+sensors:
+
+  pose:
+    type: pose
+    frame: base_link
+    frequency_hz: 10
+    outputs:
+      - position_xyz
+      - orientation_quaternion
+
+  depth:
+    type: depth
+    frame: base_link
+    frequency_hz: 10
+    outputs:
+      - depth_m
+
+  imu:
+    type: imu
+    frame: base_link
+    frequency_hz: 10
+    outputs:
+      - linear_acceleration_xyz
+      - angular_velocity_xyz
+
+  velocity:
+    type: velocity
+    frame: base_link
+    frequency_hz: 10
+    outputs:
+      - linear_velocity_xyz
+
+  front_camera:
+    type: rgb_camera
+    frame: camera_front
+    frequency_hz: 30
+    resolution: [640, 480]
+    fov_deg: 90.0
+    modality: vision
+    role: auxiliary
+
+  bottom_camera:
+    type: rgb_camera
+    frame: camera_bottom
+    frequency_hz: 30
+    resolution: [640, 480]
+    fov_deg: 90.0
+    modality: vision
+    role: sonar_context
+
+  imaging_sonar:
+    type: imaging_sonar
+    frame: sonar_frame
+    frequency_hz: 1
+    modality: acoustic
+    role: primary_detection
+    data_format: raw_numeric
+
+  dvl:
+    type: dvl
+    frame: dvl_frame
+    frequency_hz: 10
+    outputs:
+      - velocity_xyz
+      - range
+
+  range_finder:
+    type: single_beam_lidar
+    frame: rangefinder_frame
+    frequency_hz: 10
+    outputs:
+      - distance_m
+
+  collision:
+    type: collision
+    frame: base_link
+    frequency_hz: 5
+    outputs:
+      - contact_flag
