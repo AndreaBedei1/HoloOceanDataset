@@ -134,6 +134,16 @@ def run_single_depth(depth_m: float, run_idx: int):
         frames_per_sec=True
     ) as env:
 
+        print(env.info())
+
+        # lascia stabilizzare livello/materiali
+        env.tick(2)
+
+        env.water_fog(9.0, 0.2)
+        env.water_color(1.0, 0.0, 0.0)
+
+        print(env.info())
+
         last = {}
 
         while writer.frame_id < MAX_FRAMES_PER_RUN:
