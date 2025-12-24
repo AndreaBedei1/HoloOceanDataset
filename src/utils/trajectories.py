@@ -24,13 +24,27 @@ class LateralTrajectory:
 
     def command(self, t):
         cmd = np.zeros(8, dtype=np.float32)
+        cmd[4] -= self.speed
+        cmd[5] += self.speed
+        cmd[6] -= self.speed
+        cmd[7] += self.speed 
+
+        return cmd
+
+class LateralOppositeTrajectory:
+    name = "lateral_opposite"
+    yaw_deg = 90
+
+    def __init__(self, speed=25.0):
+        self.speed = float(speed)
+
+    def command(self, t):
+        cmd = np.zeros(8, dtype=np.float32)
         cmd[4] += self.speed
         cmd[5] -= self.speed
         cmd[6] += self.speed
         cmd[7] -= self.speed
-
         return cmd
-
 
 class ZigZagTrajectory:
     """

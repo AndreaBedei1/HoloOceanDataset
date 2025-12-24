@@ -71,7 +71,7 @@ class Rover:
                     socket="SonarSocket",
                     rotation=[0.0, 90.0, 0.0],
                     location=[0.0, 0.0, -0.3],
-                    Hz=1,
+                    Hz=2,
                     Azimuth=90.0,            
                     AzimuthBins=256,                           
                     RangeMin=1.0,

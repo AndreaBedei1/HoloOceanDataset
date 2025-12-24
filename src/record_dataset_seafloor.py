@@ -19,14 +19,10 @@ from utils.writer import DatasetWriter
 from utils.trajectories import (
     ForwardTrajectory,
     LateralTrajectory,
+    LateralOppositeTrajectory,
     ZigZagTrajectory,
 )
 
-
-
-# ============================
-# CONFIG DATASET
-# ============================
 
 DATASET_ROOT = "dataset/runs"
 OBJECT_CLASS = "seafloor"
@@ -40,19 +36,17 @@ SONAR_KEY = "ImagingSonar"
 
 MAX_FRAMES_PER_RUN = 100
 
+START_X = -300
+START_YS = [200, 202, 204] 
 
 
-
-TRAJECTORIES = [                              
+TRAJECTORIES = [
     ForwardTrajectory(),
     LateralTrajectory(),
+    LateralOppositeTrajectory(),  
     ZigZagTrajectory(),
 ]
 
-
-# ============================
-# SENSOR CACHE MAP
-# ============================
 
 SENSOR_MAP = {
     "Pose": "PoseSensor",
@@ -62,21 +56,18 @@ SENSOR_MAP = {
 }
 
 
-# ============================
-# SINGLE RUN
-# ============================
-
-def run_single(depth_m: float, traj, run_idx: int): 
+def run_single(depth_m: float, start_y: float, traj, run_idx: int):
 
     run_id = f"run_{run_idx:04d}"
-    print(f"\nAvvio {run_id} | depth={depth_m} | motion={traj.name}")  
+    print(f"\nAvvio {run_id} | depth={depth_m} | y={start_y} | motion={traj.name}")
 
     run_metadata = {
         "run_id": run_id,
         "primary_object": OBJECT_CLASS,
         "initial_depth_m": depth_m,
+        "initial_position": [START_X, start_y, -depth_m], 
         "map": MAP_NAME,
-        "motion": traj.name,                           
+        "motion": traj.name,
         "notes": "Seafloor-only acquisition"
     }
 
@@ -86,11 +77,17 @@ def run_single(depth_m: float, traj, run_idx: int):
     with open(os.path.join(run_path, "run_metadata.yaml"), "w") as f:
         yaml.safe_dump(run_metadata, f)
 
-    # POSIZIONE DI PARTENZA: INVARIATA
+    if traj.name == "lateral":
+        rot = [0, 0, -90]
+    elif traj.name == "lateral_opposite":
+        rot = [0, 0, 90]
+    else:
+        rot = [0, 0, 180]
+
     rov = Rover.BlueROV2(
         name="rov0",
-        location=[-300, 200, -depth_m],      
-        rotation=[0, 0, -90] if traj.name == "lateral" else [0, 0, -90],  
+        location=[START_X, start_y, -depth_m],  
+        rotation=rot,                           
         control_scheme=0,
     )
 
@@ -125,8 +122,8 @@ def run_single(depth_m: float, traj, run_idx: int):
 
         while writer.frame_id < MAX_FRAMES_PER_RUN:
 
-            state = env.step(traj.command(t))   
-            t += 1                              
+            state = env.step(traj.command(t))
+            t += 1
 
             for key, sensor_name in SENSOR_MAP.items():
                 if sensor_name in state:
@@ -148,18 +145,15 @@ def run_single(depth_m: float, traj, run_idx: int):
     print(f"{run_id} completata")
 
 
-# ============================
-# MAIN
-# ============================
-
 def main():
-    run_idx = 0
-    for depth in DEPTHS_M:                    
-        for traj in TRAJECTORIES:             
-            run_single(depth, traj, run_idx)
-            run_idx += 1
+    run_idx = 0 
+    for depth in DEPTHS_M:
+        for start_y in START_YS:
+            for traj in TRAJECTORIES:
+                run_single(depth, start_y, traj, run_idx)
+                run_idx += 1
 
-    print("\nDataset complete")
+    print("\n DATASET COMPLETE")
 
 
 if __name__ == "__main__":

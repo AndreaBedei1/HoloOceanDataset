@@ -1,6 +1,5 @@
 import os
 import yaml
-import numpy as np
 import holoocean
 
 from lib.scenario_builder import ScenarioConfig
@@ -16,11 +15,12 @@ from telemetry.estimation import (
 
 from utils.convert import pose_to_csv_fields, velocity_to_csv_fields
 from utils.writer import DatasetWriter
-
-
-# ============================
-# CONFIG DATASET
-# ============================
+from utils.trajectories import (
+    ForwardTrajectory,
+    LateralTrajectory,
+    LateralOppositeTrajectory,
+    ZigZagTrajectory,
+)
 
 DATASET_ROOT = "dataset/runs"
 OBJECT_CLASS = "tube"
@@ -34,85 +34,15 @@ SONAR_KEY = "ImagingSonar"
 
 MAX_FRAMES_PER_RUN = 100
 
-# ============================
-# TRAJECTORY CONTROLLERS
-# ============================
-
-class ForwardTrajectory:
-    name = "forward"
-    yaw_deg = 180
-
-    def __init__(self, speed=25.0):
-        self.speed = float(speed)
-
-    def command(self, t: int) -> np.ndarray:
-        cmd = np.zeros(8, dtype=np.float32)
-        cmd[4:] = self.speed  # surge
-        return cmd
-
-class LateralTrajectory:
-    name = "lateral"
-
-    def __init__(self, speed=25.0, yaw_rate=20.0, turn_frames=30):
-        self.speed = speed
-        self.yaw_rate = yaw_rate
-        self.turn_frames = turn_frames
-
-    def command(self, t):
-        cmd = np.zeros(8, dtype=np.float32)
-        cmd[4] -= self.speed
-        cmd[5] += self.speed
-        cmd[6] -= self.speed
-        cmd[7] += self.speed
-        return cmd
-
-
-
-class ZigZagTrajectory:
-    """
-    Avanza in forward con zig-zag laterale (strafe alternato)
-    """
-    name = "zigzag"
-
-    def __init__(self, speed=20.0, sway=15.0, period=50):
-        self.speed = speed
-        self.sway = sway
-        self.period = period
-
-    def command(self, t):
-        cmd = np.zeros(8, dtype=np.float32)
-
-        # --- forward puro (W) ---
-        cmd[4:8] += self.speed
-
-        # --- zigzag laterale (A / D) ---
-        phase = (t // self.period) % 2
-
-        if phase == 0:
-            # strafe left (A)
-            cmd[4] += self.sway
-            cmd[5] -= self.sway
-            cmd[6] += self.sway
-            cmd[7] -= self.sway
-        else:
-            # strafe right (D)
-            cmd[4] -= self.sway
-            cmd[5] += self.sway
-            cmd[6] -= self.sway
-            cmd[7] += self.sway
-
-        return cmd
-
+START_X = 30
+START_YS = [42, 44, 46]
 
 TRAJECTORIES = [
     ForwardTrajectory(),
     LateralTrajectory(),
+    LateralOppositeTrajectory(),  
     ZigZagTrajectory(),
 ]
-
-# ============================
-# SENSOR MAP
-# ============================
 
 SENSOR_MAP = {
     "Pose": "PoseSensor",
@@ -121,20 +51,16 @@ SENSOR_MAP = {
     "Depth": "DepthSensor",
 }
 
-# ============================
-# SINGLE RUN
-# ============================
-
-def run_single(depth_m, traj, run_idx):
+def run_single(depth_m, start_y, traj, run_idx):
 
     run_id = f"run_{run_idx:04d}"
-    print(f"\n {run_id} | depth={depth_m} | motion={traj.name}")
+    print(f"\n {run_id} | depth={depth_m} | y={start_y} | motion={traj.name}")
 
-    # ---------- METADATA ----------
     run_metadata = {
         "run_id": run_id,
         "primary_object": OBJECT_CLASS,
         "initial_depth_m": depth_m,
+        "initial_position": [START_X, start_y, -depth_m],
         "map": MAP_NAME,
         "motion_pattern": traj.name,
         "notes": "tube, partially buried, always visible in sonar"
@@ -146,11 +72,17 @@ def run_single(depth_m, traj, run_idx):
     with open(os.path.join(run_path, "run_metadata.yaml"), "w") as f:
         yaml.safe_dump(run_metadata, f)
 
-    # ---------- ROVER ----------
+    if traj.name == "lateral":
+        rot = [0, 0, -90]
+    elif traj.name == "lateral_opposite":
+        rot = [0, 0, 90]
+    else:
+        rot = [0, 0, 180]
+
     rov = Rover.BlueROV2(
         name="rov0",
-        location=[30, 45, -depth_m],
-        rotation = [0, 0, 180] if traj.name != "lateral" else [0, 0, -90],
+        location=[START_X, start_y, -depth_m], 
+        rotation=rot,                           
         control_scheme=0,
     )
 
@@ -160,7 +92,6 @@ def run_single(depth_m, traj, run_idx):
         .add_agent(rov)
     )
 
-    # ---------- WRITER ----------
     writer = DatasetWriter(
         root=DATASET_ROOT,
         run_id=run_id,
@@ -171,7 +102,6 @@ def run_single(depth_m, traj, run_idx):
         velocity_to_csv_fields=velocity_to_csv_fields,
     )
 
-    # ---------- SIM ----------
     with holoocean.make(
         scenario_cfg=scenario.to_dict(),
         show_viewport=True,
@@ -207,22 +137,17 @@ def run_single(depth_m, traj, run_idx):
             writer.write_frame(state, telemetry)
 
     writer.close()
-    print(f" {run_id} completata")
-
-
-# ============================
-# MAIN
-# ============================
+    print(f" {run_id} compelte")
 
 def main():
-    run_idx = 12
-    # for depth in DEPTHS_M:
-    #     for traj in TRAJECTORIES:
-    #         run_single(depth, traj, run_idx)
-    #         run_idx += 1
-    run_single(DEPTHS_M[0], ZigZagTrajectory(), run_idx)
+    run_idx = 49
+    for depth in DEPTHS_M:
+        for start_y in START_YS:               
+            for traj in TRAJECTORIES:
+                run_single(depth, start_y, traj, run_idx) 
+                run_idx += 1
 
-    print("\n DATASET COMPLETO")
+    print("\n DATASET COMPLETE ")
 
 
 if __name__ == "__main__":
