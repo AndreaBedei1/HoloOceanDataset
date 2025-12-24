@@ -16,6 +16,12 @@ from telemetry.estimation import (
 
 from utils.convert import pose_to_csv_fields, velocity_to_csv_fields
 from utils.writer import DatasetWriter
+from utils.trajectories import (
+    ForwardTrajectory,
+    LateralTrajectory,
+    ZigZagTrajectory,
+)
+
 
 
 # ============================
@@ -35,64 +41,12 @@ SONAR_KEY = "ImagingSonar"
 MAX_FRAMES_PER_RUN = 100
 
 
-# ============================
-# TRAJECTORY CONTROLLERS
-# ============================
-
-class ForwardTrajectory:
-    name = "forward"
-    yaw_deg = 180
-
-    def __init__(self, speed=25.0):
-        self.speed = float(speed)
-
-    def command(self, t: int) -> np.ndarray:
-        cmd = np.zeros(8, dtype=np.float32)
-        cmd[4] = self.speed  # surge forward
-        return cmd
 
 
-class ZigZagForwardTrajectory:
-    name = "zigzag_forward"
-    yaw_deg = 180
-
-    def __init__(self, speed=20.0, sway=15.0, period=30):
-        self.speed = float(speed)
-        self.sway = float(sway)
-        self.period = int(period)
-
-    def command(self, t: int) -> np.ndarray:
-        cmd = np.zeros(8, dtype=np.float32)
-        cmd[4] = self.speed  # surge forward
-
-        # alterna sway L/R ogni "period" frame
-        phase = (t // self.period) % 2
-        cmd[0] = self.sway if phase == 0 else -self.sway
-
-        return cmd
-
-
-class SideStraightTrajectory:
-    """
-    Rover ruotato di 90° e poi "va dritto" (surge),
-    che nel mondo corrisponde a muoversi lateralmente rispetto al caso forward.
-    """
-    name = "side_straight"
-    yaw_deg = 90
-
-    def __init__(self, speed=25.0):
-        self.speed = float(speed)
-
-    def command(self, t: int) -> np.ndarray:
-        cmd = np.zeros(8, dtype=np.float32)
-        cmd[4] = self.speed  # surge forward (nel frame ROV)
-        return cmd
-
-
-TRAJECTORIES = [
-    ForwardTrajectory(speed=25.0),
-    ZigZagForwardTrajectory(speed=20.0, sway=15.0, period=30),
-    SideStraightTrajectory(speed=25.0),
+TRAJECTORIES = [                              
+    ForwardTrajectory(),
+    LateralTrajectory(),
+    ZigZagTrajectory(),
 ]
 
 
@@ -112,18 +66,17 @@ SENSOR_MAP = {
 # SINGLE RUN
 # ============================
 
-def run_single(depth_m: float, traj, run_idx: int):
+def run_single(depth_m: float, traj, run_idx: int): 
 
     run_id = f"run_{run_idx:04d}"
-    print(f"\nAvvio {run_id} | depth={depth_m} | motion={traj.name}")
+    print(f"\nAvvio {run_id} | depth={depth_m} | motion={traj.name}")  
 
     run_metadata = {
         "run_id": run_id,
         "primary_object": OBJECT_CLASS,
-        "initial_depth_m": float(depth_m),
+        "initial_depth_m": depth_m,
         "map": MAP_NAME,
-        "motion_pattern": traj.name,
-        "yaw_deg": getattr(traj, "yaw_deg", None),
+        "motion": traj.name,                           
         "notes": "Seafloor-only acquisition"
     }
 
@@ -133,14 +86,11 @@ def run_single(depth_m: float, traj, run_idx: int):
     with open(os.path.join(run_path, "run_metadata.yaml"), "w") as f:
         yaml.safe_dump(run_metadata, f)
 
-    # Rotation: 180 per forward/zigzag, 90 per side_straight
-    yaw = float(getattr(traj, "yaw_deg", 180))
-    rotation = [0, 0, yaw]
-
+    # POSIZIONE DI PARTENZA: INVARIATA
     rov = Rover.BlueROV2(
         name="rov0",
-        location=[-300, 200, -depth_m],
-        rotation=rotation,
+        location=[-300, 200, -depth_m],      
+        rotation=[0, 0, -90] if traj.name == "lateral" else [0, 0, -90],  
         control_scheme=0,
     )
 
@@ -175,8 +125,8 @@ def run_single(depth_m: float, traj, run_idx: int):
 
         while writer.frame_id < MAX_FRAMES_PER_RUN:
 
-            state = env.step(traj.command(t))
-            t += 1
+            state = env.step(traj.command(t))   
+            t += 1                              
 
             for key, sensor_name in SENSOR_MAP.items():
                 if sensor_name in state:
@@ -204,12 +154,11 @@ def run_single(depth_m: float, traj, run_idx: int):
 
 def main():
     run_idx = 0
-    # for depth in DEPTHS_M:
-    #     for traj in TRAJECTORIES:
-    #         run_single(depth, traj, run_idx)
-    #         run_idx += 1
+    for depth in DEPTHS_M:                    
+        for traj in TRAJECTORIES:             
+            run_single(depth, traj, run_idx)
+            run_idx += 1
 
-    run_single(DEPTHS_M[0], TRAJECTORIES[0], run_idx)
     print("\nDataset complete")
 
 

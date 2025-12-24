@@ -40,23 +40,17 @@ MAX_FRAMES_PER_RUN = 100
 
 class ForwardTrajectory:
     name = "forward"
+    yaw_deg = 180
 
     def __init__(self, speed=25.0):
-        self.speed = speed
+        self.speed = float(speed)
 
-    def command(self, t):
+    def command(self, t: int) -> np.ndarray:
         cmd = np.zeros(8, dtype=np.float32)
-        cmd[4] = self.speed   # surge
-        cmd[5] = 0.0          # yaw BLINDATO
+        cmd[4:] = self.speed  # surge
         return cmd
 
-
-
 class LateralTrajectory:
-    """
-    1) ruota di 90°
-    2) va di lato (sway)
-    """
     name = "lateral"
 
     def __init__(self, speed=25.0, yaw_rate=20.0, turn_frames=30):
@@ -66,32 +60,46 @@ class LateralTrajectory:
 
     def command(self, t):
         cmd = np.zeros(8, dtype=np.float32)
-
-        if t < self.turn_frames:
-            cmd[5] = self.yaw_rate      # yaw
-        else:
-            cmd[0] = self.speed         # sway (laterale)
-
+        cmd[4] -= self.speed
+        cmd[5] += self.speed
+        cmd[6] -= self.speed
+        cmd[7] += self.speed
         return cmd
+
 
 
 class ZigZagTrajectory:
     """
-    Alterna sinistra/destra mentre avanza
+    Avanza in forward con zig-zag laterale (strafe alternato)
     """
     name = "zigzag"
 
-    def __init__(self, speed=20.0, sway=15.0, period=40):
+    def __init__(self, speed=20.0, sway=15.0, period=50):
         self.speed = speed
         self.sway = sway
         self.period = period
 
     def command(self, t):
         cmd = np.zeros(8, dtype=np.float32)
-        cmd[4] = self.speed
 
+        # --- forward puro (W) ---
+        cmd[4:8] += self.speed
+
+        # --- zigzag laterale (A / D) ---
         phase = (t // self.period) % 2
-        cmd[0] = self.sway if phase == 0 else -self.sway
+
+        if phase == 0:
+            # strafe left (A)
+            cmd[4] += self.sway
+            cmd[5] -= self.sway
+            cmd[6] += self.sway
+            cmd[7] -= self.sway
+        else:
+            # strafe right (D)
+            cmd[4] -= self.sway
+            cmd[5] += self.sway
+            cmd[6] -= self.sway
+            cmd[7] += self.sway
 
         return cmd
 
@@ -141,8 +149,8 @@ def run_single(depth_m, traj, run_idx):
     # ---------- ROVER ----------
     rov = Rover.BlueROV2(
         name="rov0",
-        location=[50, 45, -depth_m],
-        rotation=[0, 0, 180],
+        location=[30, 45, -depth_m],
+        rotation = [0, 0, 180] if traj.name != "lateral" else [0, 0, -90],
         control_scheme=0,
     )
 
@@ -212,7 +220,7 @@ def main():
     #     for traj in TRAJECTORIES:
     #         run_single(depth, traj, run_idx)
     #         run_idx += 1
-    run_single(DEPTHS_M[0], TRAJECTORIES[0], run_idx)
+    run_single(DEPTHS_M[0], ZigZagTrajectory(), run_idx)
 
     print("\n DATASET COMPLETO")
 
