@@ -11,6 +11,24 @@ def estimate_velocity(vel):
         "vz": float(v[2]),
     }
 
+def parse_velocity(vel):
+    """
+    Returns raw body/world velocity as vx, vy, vz
+    """
+    if vel is None:
+        return None
+
+    v = np.asarray(vel).reshape(-1)
+
+    if v.shape[0] < 3:
+        return None
+
+    return {
+        "vx": float(v[0]),
+        "vy": float(v[1]),
+        "vz": float(v[2]),
+    }
+
 
 def parse_depth(depth):
     if depth is None:
