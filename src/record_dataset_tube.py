@@ -25,7 +25,7 @@ from utils.trajectories import (
 DATASET_ROOT = "dataset/runs"
 OBJECT_CLASS = "tube"
 MAP_NAME = "DAM"
-
+# [60, 55, 50, 45]
 DEPTHS_M = [60, 55, 50, 45]
 
 FRONT_CAM = "FrontCamera"
