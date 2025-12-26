@@ -2,7 +2,7 @@ import glob
 import cv2
 
 files = sorted(glob.glob(
-    "dataset/runs/run_0003/front_rgb/*.jpg"
+    "dataset/runs/run_0003/images/bottom/*.png"
 ))
 
 cv2.namedWindow("RGB Viewer", cv2.WINDOW_NORMAL)
