@@ -1,6 +1,5 @@
 import os
 import yaml
-import numpy as np
 import holoocean
 
 from lib.scenario_builder import ScenarioConfig
@@ -23,30 +22,34 @@ from utils.trajectories import (
     ZigZagTrajectory,
 )
 
+# ===================== CONFIG =====================
 
 DATASET_ROOT = "dataset/runs"
-OBJECT_CLASS = "seafloor"
-MAP_NAME = "DAM"
+OBJECT_CLASS = "submarine"
 
-DEPTHS_M = [60, 55, 50, 45]
+MAP_NAME = "World.OpenWater"
+
+START_POSITIONS = [
+    (15.0, -15.0, -285.0),
+    (13.8, -15.0, -285.0),
+    (12.5, -15.0, -285.0),
+]
+
+DEPTHS_Z = [-285.0, -280.0, -275.0, -270.0]
+
+STOP_Y = -52.0
+DESCENT_PER_FRAME = -0.02  # meters per frame (gentle descent)
 
 FRONT_CAM = "FrontCamera"
 BOTTOM_CAM = "SonarCamera"
 SONAR_KEY = "ImagingSonar"
 
-MAX_FRAMES_PER_RUN = 100
-
-START_X = -300
-START_YS = [200, 202, 204] 
-
-
 TRAJECTORIES = [
     ForwardTrajectory(),
     LateralTrajectory(),
-    LateralOppositeTrajectory(),  
+    LateralOppositeTrajectory(),
     ZigZagTrajectory(),
 ]
-
 
 SENSOR_MAP = {
     "Pose": "PoseSensor",
@@ -55,20 +58,32 @@ SENSOR_MAP = {
     "Depth": "DepthSensor",
 }
 
+# ===================== CORE =====================
 
-def run_single(depth_m: float, start_y: float, traj, run_idx: int):
+def rotation_for_trajectory(traj):
+    if traj.name == "lateral":
+        return [0, 0, -358]
+    elif traj.name == "lateral_opposite":
+        return [0, 0, -178]
+    else:
+        return [0, 0, -88]
+
+def run_single(start_pos, start_z, traj, run_idx):
 
     run_id = f"run_{run_idx:04d}"
-    print(f"\nAvvio {run_id} | depth={depth_m} | y={start_y} | motion={traj.name}")
+    x0, y0, _ = start_pos
+
+    print(f"\n{run_id} | start=({x0},{y0},{start_z}) | traj={traj.name}")
 
     run_metadata = {
         "run_id": run_id,
         "primary_object": OBJECT_CLASS,
-        "initial_depth_m": depth_m,
-        "initial_position": [START_X, start_y, -depth_m], 
+        "initial_depth_m": start_z,
+        "initial_position": [x0, y0, start_z],
         "map": MAP_NAME,
-        "motion": traj.name,
-        "notes": "Seafloor-only acquisition"
+        "motion_pattern": traj.name,
+        "descent_per_frame": DESCENT_PER_FRAME,
+        "stop_condition": f"y < {STOP_Y}",
     }
 
     run_path = os.path.join(DATASET_ROOT, run_id)
@@ -77,23 +92,16 @@ def run_single(depth_m: float, start_y: float, traj, run_idx: int):
     with open(os.path.join(run_path, "run_metadata.yaml"), "w") as f:
         yaml.safe_dump(run_metadata, f)
 
-    if traj.name == "lateral":
-        rot = [0, 0, -360]
-    elif traj.name == "lateral_opposite":
-        rot = [0, 0, -180]
-    else:
-        rot = [0, 0, -90]
-
     rov = Rover.BlueROV2(
         name="rov0",
-        location=[START_X, start_y, -depth_m],  
-        rotation=rot,                           
+        location=[x0, y0, start_z],
+        rotation=rotation_for_trajectory(traj),
         control_scheme=0,
     )
 
     scenario = (
         ScenarioConfig("DatasetRun")
-        .set_world(World.Dam)
+        .set_world(World.OpenWater)
         .add_agent(rov)
     )
 
@@ -115,25 +123,37 @@ def run_single(depth_m: float, start_y: float, traj, run_idx: int):
     ) as env:
 
         env.tick(2)
-        env.water_fog(5.0, 5)
 
         last = {}
         t = 0
 
-        while writer.frame_id < MAX_FRAMES_PER_RUN:
+        while True:
 
-            state = env.step(traj.command(t))
+            cmd = traj.command(t)
+            cmd[2] += DESCENT_PER_FRAME  # apply gentle descent
             t += 1
 
-            for key, sensor_name in SENSOR_MAP.items():
-                if sensor_name in state:
-                    last[key] = state[sensor_name]
+            state = env.step(cmd)
+
+            for k, s in SENSOR_MAP.items():
+                if s in state:
+                    last[k] = state[s]
+
+            pose = parse_pose(last.get("Pose"))
+            if pose is None:
+                continue
+
+            _, y, _ = pose["position"]
+
+            if y < STOP_Y:
+                print(f" Stop condition reached (y={y:.2f})")
+                break
 
             if SONAR_KEY not in state:
                 continue
 
             telemetry = {
-                "pose": parse_pose(last.get("Pose")),
+                "pose": pose,
                 "velocity": parse_velocity(last.get("Velocity")),
                 "altitude": parse_depth(last.get("Depth")),
                 "motion": estimate_motion_state(last.get("IMU")),
@@ -142,15 +162,15 @@ def run_single(depth_m: float, start_y: float, traj, run_idx: int):
             writer.write_frame(state, telemetry)
 
     writer.close()
-    print(f"{run_id} completata")
+    print(f"{run_id} complete")
 
 
 def main():
-    run_idx = 0 
-    for depth in DEPTHS_M:
-        for start_y in START_YS:
+    run_idx = 49
+    for start_pos in START_POSITIONS:
+        for z in DEPTHS_Z:
             for traj in TRAJECTORIES:
-                run_single(depth, start_y, traj, run_idx)
+                run_single(start_pos, z, traj, run_idx)
                 run_idx += 1
 
     print("\n DATASET COMPLETE")

@@ -140,7 +140,7 @@ def run_single(depth_m, start_y, traj, run_idx):
     print(f" {run_id} compelte")
 
 def main():
-    run_idx = 49
+    run_idx = 48
     for depth in DEPTHS_M:
         for start_y in START_YS:               
             for traj in TRAJECTORIES:
