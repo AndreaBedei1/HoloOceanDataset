@@ -183,7 +183,8 @@ def main():
             for traj in TRAJECTORIES:
                 run_single(depth, start_y, traj, run_idx) 
                 run_idx += 1
-                time.pause(2)
+                time.sleep(2)  
+
 
     print("\n DATASET COMPLETE ")
 
