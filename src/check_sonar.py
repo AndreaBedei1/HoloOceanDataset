@@ -4,7 +4,7 @@ import numpy as np
 from utils.sonar_viz import PolarSonarVisualizerAsync
 
 files = sorted(glob.glob(
-    "dataset/runs/run_0003/sonar_raw/*.npz"
+    "dataset/runs/run_0097/sonar_raw/*.npz"
 ))
 
 viz = PolarSonarVisualizerAsync(

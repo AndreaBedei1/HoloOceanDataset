@@ -1,6 +1,7 @@
 import os
 import yaml
 import holoocean
+import time
 
 from lib.scenario_builder import ScenarioConfig
 from lib.worlds import World
@@ -37,8 +38,8 @@ START_POSITIONS = [
 
 DEPTHS_Z = [-285.0, -280.0, -275.0, -270.0]
 
-STOP_Y = -52.0
-DESCENT_PER_FRAME = -0.02  # meters per frame (gentle descent)
+STOP_Y = -53.0
+DESCENT_PER_FRAME = 4  # meters per frame (gentle descent)
 
 FRONT_CAM = "FrontCamera"
 BOTTOM_CAM = "SonarCamera"
@@ -55,7 +56,7 @@ SENSOR_MAP = {
     "Pose": "PoseSensor",
     "Velocity": "VelocitySensor",
     "IMU": "IMUSensor",
-    "Depth": "DepthSensor",
+    "Depth": "RangeFinderSensor",
 }
 
 # ===================== CORE =====================
@@ -77,13 +78,47 @@ def run_single(start_pos, start_z, traj, run_idx):
 
     run_metadata = {
         "run_id": run_id,
-        "primary_object": OBJECT_CLASS,
-        "initial_depth_m": start_z,
-        "initial_position": [x0, y0, start_z],
+        "dataset_version": "v1.0",
         "map": MAP_NAME,
+        "primary_object": OBJECT_CLASS,
+
+        "initial_position": {
+            "x": x0,
+            "y": y0,
+            "z": start_z,
+        },
+        "initial_depth_m": abs(start_z),
         "motion_pattern": traj.name,
-        "descent_per_frame": DESCENT_PER_FRAME,
-        "stop_condition": f"y < {STOP_Y}",
+        "control_mode": "thruster",
+
+        "vertical_motion": {
+            "enabled": True,
+            "method": "vertical_thrusters",
+            "vertical_thrust": DESCENT_PER_FRAME,
+        },
+
+        "termination": {
+            "type": "y_threshold",
+            "max_frames": None,
+            "y_threshold": STOP_Y,
+        },
+
+        "sensors": {
+            "front_camera": FRONT_CAM,
+            "bottom_camera": BOTTOM_CAM,
+            "sonar": SONAR_KEY,
+            "altitude_sensor": "RangeFinderSensor",
+        },
+
+        "environment": {
+            "water_fog": {
+                "enabled": True,
+                "density": 5.0,
+                "distance": 5.0,
+            }
+        },
+
+        "notes": "OpenWater descending run",
     }
 
     run_path = os.path.join(DATASET_ROOT, run_id)
@@ -123,6 +158,7 @@ def run_single(start_pos, start_z, traj, run_idx):
     ) as env:
 
         env.tick(2)
+        env.water_fog(5.0, 5)
 
         last = {}
         t = 0
@@ -130,7 +166,7 @@ def run_single(start_pos, start_z, traj, run_idx):
         while True:
 
             cmd = traj.command(t)
-            cmd[2] += DESCENT_PER_FRAME  # apply gentle descent
+            cmd[0:4] = -DESCENT_PER_FRAME  # apply gentle descent
             t += 1
 
             state = env.step(cmd)
@@ -143,7 +179,8 @@ def run_single(start_pos, start_z, traj, run_idx):
             if pose is None:
                 continue
 
-            _, y, _ = pose["position"]
+
+            _, y, _ = pose["pos"]
 
             if y < STOP_Y:
                 print(f" Stop condition reached (y={y:.2f})")
@@ -166,12 +203,13 @@ def run_single(start_pos, start_z, traj, run_idx):
 
 
 def main():
-    run_idx = 49
+    run_idx = 97
     for start_pos in START_POSITIONS:
         for z in DEPTHS_Z:
             for traj in TRAJECTORIES:
                 run_single(start_pos, z, traj, run_idx)
                 run_idx += 1
+                time.sleep(2)  
 
     print("\n DATASET COMPLETE")
 

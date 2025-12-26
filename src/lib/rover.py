@@ -109,11 +109,13 @@ class Rover:
                 ),
 
                 Sensor.RangeFinder(
-                    name="FrontRangeFinder",
+                    name="SubRangeFinder",
                     socket="RangeFinder",
-                    location=[0.0, 0.0, 0.0],
-                    rotation=[0.0, 0.0, 0.0], 
-                    Hz=10,
+                    # location=[0.0, 0.0, 0.0],
+                    # rotation=[0.0, 0.0, 0.0], 
+                    rotation=[0.0, 90.0, 0.0],
+                    location=[0.0, 0.0, -0.3],
+                    Hz=30,
                     LaserCount=1,             
                     LaserAngle=0.0,           
                     LaserMaxDistance=200.0,

@@ -2,6 +2,7 @@ import os
 import yaml
 import numpy as np
 import holoocean
+import time
 
 from lib.scenario_builder import ScenarioConfig
 from lib.worlds import World
@@ -52,7 +53,7 @@ SENSOR_MAP = {
     "Pose": "PoseSensor",
     "Velocity": "VelocitySensor",
     "IMU": "IMUSensor",
-    "Depth": "DepthSensor",
+    "Depth": "RangeFinderSensor",
 }
 
 
@@ -63,13 +64,49 @@ def run_single(depth_m: float, start_y: float, traj, run_idx: int):
 
     run_metadata = {
         "run_id": run_id,
-        "primary_object": OBJECT_CLASS,
-        "initial_depth_m": depth_m,
-        "initial_position": [START_X, start_y, -depth_m], 
+        "dataset_version": "v1.0",
         "map": MAP_NAME,
-        "motion": traj.name,
-        "notes": "Seafloor-only acquisition"
+        "primary_object": OBJECT_CLASS,
+
+        "initial_position": {
+            "x": START_X,
+            "y": start_y,
+            "z": -depth_m,
+        },
+        "initial_depth_m": depth_m,
+        "motion_pattern": traj.name,
+        "control_mode": "thruster",
+
+        "vertical_motion": {
+            "enabled": False,
+            "method": "none",
+            "vertical_thrust": 0.0,
+        },
+
+        "termination": {
+            "type": "max_frames",
+            "max_frames": MAX_FRAMES_PER_RUN,
+            "y_threshold": None,
+        },
+
+        "sensors": {
+            "front_camera": FRONT_CAM,
+            "bottom_camera": BOTTOM_CAM,
+            "sonar": SONAR_KEY,
+            "altitude_sensor": "RangeFinderSensor",
+        },
+
+        "environment": {
+            "water_fog": {
+                "enabled": True,
+                "density": 5.0,
+                "distance": 5.0,
+            }
+        },
+
+        "notes": "DAM static-depth acquisition",
     }
+
 
     run_path = os.path.join(DATASET_ROOT, run_id)
     os.makedirs(run_path, exist_ok=True)
@@ -131,7 +168,7 @@ def run_single(depth_m: float, start_y: float, traj, run_idx: int):
 
             if SONAR_KEY not in state:
                 continue
-
+            
             telemetry = {
                 "pose": parse_pose(last.get("Pose")),
                 "velocity": parse_velocity(last.get("Velocity")),
@@ -152,6 +189,7 @@ def main():
             for traj in TRAJECTORIES:
                 run_single(depth, start_y, traj, run_idx)
                 run_idx += 1
+                time.sleep(2)
 
     print("\n DATASET COMPLETE")
 

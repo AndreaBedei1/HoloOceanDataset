@@ -30,16 +30,10 @@ def parse_velocity(vel):
     }
 
 
-def parse_depth(depth):
-    if depth is None:
+def parse_depth(rangefinder):
+    if rangefinder is None or len(rangefinder) == 0:
         return None
-
-    depth = np.asarray(depth)
-
-    if depth.size == 0:
-        return None
-
-    return float(depth.reshape(-1)[0])
+    return float(rangefinder[0])
 
 
 def estimate_motion_state(imu, threshold=0.5):
@@ -55,8 +49,3 @@ def estimate_motion_state(imu, threshold=0.5):
         else "STABLE"
     )
 
-
-def estimate_front_obstacle(rangefinder):
-    if rangefinder is None or len(rangefinder) == 0:
-        return None
-    return float(rangefinder[0])
