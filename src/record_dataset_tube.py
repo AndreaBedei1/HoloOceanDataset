@@ -2,6 +2,8 @@ import os
 import yaml
 import holoocean
 import time
+import multiprocessing as mp
+import traceback
 
 from lib.scenario_builder import ScenarioConfig
 from lib.worlds import World
@@ -27,7 +29,7 @@ DATASET_ROOT = "dataset/runs"
 OBJECT_CLASS = "tube"
 MAP_NAME = "DAM"
 # [60, 55, 50, 45]
-DEPTHS_M = [60, 55, 50, 45]
+DEPTHS_M = [55, 50, 45]
 
 FRONT_CAM = "FrontCamera"
 BOTTOM_CAM = "SonarCamera"
@@ -176,18 +178,63 @@ def run_single(depth_m, start_y, traj, run_idx):
     writer.close()
     print(f" {run_id} compelte")
 
+RUN_TIMEOUT_SEC = 200  # ad es. 1.3 minuti per run (scegli tu)
+def _worker_run_single(args, q):
+    start_pos, start_z, traj, run_idx = args
+    try:
+        run_single(start_pos, start_z, traj, run_idx)
+        q.put(("ok", None))
+    except Exception:
+        q.put(("err", traceback.format_exc()))
+
+def run_single_with_timeout(start_pos, start_z, traj, run_idx, timeout_sec=RUN_TIMEOUT_SEC):
+    ctx = mp.get_context("spawn")
+    q = ctx.Queue()
+    p = ctx.Process(target=_worker_run_single, args=((start_pos, start_z, traj, run_idx), q))
+    p.start()
+
+    p.join(timeout_sec)
+    if p.is_alive():
+        p.terminate()
+        p.join(10)
+        return ("timeout", f"Run {run_idx} killed after {timeout_sec}s")
+
+    if not q.empty():
+        status, info = q.get()
+        return (status, info)
+
+    return ("err", "Worker exited without reporting status (possible UE crash)")
+
 def main():
+    # 48
     run_idx = 48
     for depth in DEPTHS_M:
-        for start_y in START_YS:               
+        for start_y in START_YS:
             for traj in TRAJECTORIES:
-                run_single(depth, start_y, traj, run_idx) 
-                run_idx += 1
-                time.sleep(2)  
 
+                attempt = 0
+                while True:
+                    attempt += 1
+
+                    status, info = run_single_with_timeout(
+                        depth, start_y, traj, run_idx
+                    )
+
+                    if status == "ok":
+                        print(f"[{run_idx:04d}] OK (attempt {attempt})", flush=True)
+                        run_idx += 1          
+                        time.sleep(2)
+                        break               
+
+                    print(
+                        f"[{run_idx:04d}] FAILED (attempt {attempt}): {status}\n{info}",
+                        flush=True
+                    )
+                    time.sleep(2)  
 
     print("\n DATASET COMPLETE ")
 
 
 if __name__ == "__main__":
     main()
+

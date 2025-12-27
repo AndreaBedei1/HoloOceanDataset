@@ -2,6 +2,8 @@ import os
 import yaml
 import holoocean
 import time
+import multiprocessing as mp
+import traceback
 
 from lib.scenario_builder import ScenarioConfig
 from lib.worlds import World
@@ -35,7 +37,7 @@ START_POSITIONS = [
     (13.8, -15.0, -285.0),
     (12.5, -15.0, -285.0),
 ]
-
+# [-285.0, -280.0, -275.0, -270.0]
 DEPTHS_Z = [-285.0, -280.0, -275.0, -270.0]
 
 STOP_Y = -53.0
@@ -152,7 +154,7 @@ def run_single(start_pos, start_z, traj, run_idx):
 
     with holoocean.make(
         scenario_cfg=scenario.to_dict(),
-        show_viewport=True,
+        show_viewport=False,
         ticks_per_sec=30,
         frames_per_sec=True
     ) as env:
@@ -202,17 +204,61 @@ def run_single(start_pos, start_z, traj, run_idx):
     print(f"{run_id} complete")
 
 
+
+RUN_TIMEOUT_SEC = 90  # ad es. 1.3 minuti per run (scegli tu)
+def _worker_run_single(args, q):
+    start_pos, start_z, traj, run_idx = args
+    try:
+        run_single(start_pos, start_z, traj, run_idx)
+        q.put(("ok", None))
+    except Exception:
+        q.put(("err", traceback.format_exc()))
+
+def run_single_with_timeout(start_pos, start_z, traj, run_idx, timeout_sec=RUN_TIMEOUT_SEC):
+    ctx = mp.get_context("spawn")
+    q = ctx.Queue()
+    p = ctx.Process(target=_worker_run_single, args=((start_pos, start_z, traj, run_idx), q))
+    p.start()
+
+    p.join(timeout_sec)
+    if p.is_alive():
+        p.terminate()
+        p.join(10)
+        return ("timeout", f"Run {run_idx} killed after {timeout_sec}s")
+
+    if not q.empty():
+        status, info = q.get()
+        return (status, info)
+
+    return ("err", "Worker exited without reporting status (possible UE crash)")
+
 def main():
+    # 97
     run_idx = 97
-    for start_pos in START_POSITIONS:
-        for z in DEPTHS_Z:
+    for z in DEPTHS_Z:
+        for start_pos in START_POSITIONS:
             for traj in TRAJECTORIES:
-                run_single(start_pos, z, traj, run_idx)
-                run_idx += 1
-                time.sleep(2)  
 
-    print("\n DATASET COMPLETE")
+                attempt = 0
+                while True:
+                    attempt += 1
 
+                    status, info = run_single_with_timeout(start_pos, z, traj, run_idx)
+
+                    if status == "ok":
+                        print(f"[{run_idx:04d}] OK (attempt {attempt})", flush=True)
+                        run_idx += 1          
+                        time.sleep(1)
+                        break                
+
+                    print(
+                        f"[{run_idx:04d}] FAILED (attempt {attempt}): {status}\n{info}",
+                        flush=True
+                    )
+                    time.sleep(1)
+
+    print("\nDATASET COMPLETE", flush=True)
 
 if __name__ == "__main__":
     main()
+
