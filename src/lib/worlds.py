@@ -50,6 +50,7 @@ class World:
     SimpleUnderwater = "SimpleUnderwater"
     Dam = "Dam"
     Rooms = "Rooms"
+    Example = "ExampleLevel"
 
     @classmethod
     def list_worlds(cls):

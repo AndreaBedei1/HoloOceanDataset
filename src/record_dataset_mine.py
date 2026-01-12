@@ -28,19 +28,19 @@ from utils.trajectories import (
 # ===================== CONFIG =====================
 
 DATASET_ROOT = "dataset/runs"
-OBJECT_CLASS = "submarine"
+OBJECT_CLASS = "mine"  
 
-MAP_NAME = "World.OpenWater"
+MAP_NAME = "World.Custom"  
 
 START_POSITIONS = [
-    (15.0, -15.0, -285.0),
-    (13.8, -15.0, -285.0),
-    (12.5, -15.0, -285.0),
+    (15.0, 43.0, -30.0),
+    (14.0, 43.0, -30.0),
+    (16.0, 43.0, -30.0),
 ]
-# [-285.0, -280.0, -275.0, -270.0]
-DEPTHS_Z = [-285.0, -280.0, -275.0, -270.0]
 
-STOP_Y = -53.0
+# [-30.0, -25.0, -20.0, -15.0]
+DEPTHS_Z = [-30.0, -25.0, -20.0, -15.0]  
+STOP_Y = -19.16  
 DESCENT_PER_FRAME = 4 
 
 FRONT_CAM = "FrontCamera"
@@ -65,11 +65,11 @@ SENSOR_MAP = {
 
 def rotation_for_trajectory(traj):
     if traj.name == "lateral":
-        return [0, 0, -358]
+        return [0, 0, -360]
     elif traj.name == "lateral_opposite":
-        return [0, 0, -178]
+        return [0, 0, -180]
     else:
-        return [0, 0, -88]
+        return [0, 0, -90]
 
 def run_single(start_pos, start_z, traj, run_idx):
 
@@ -120,7 +120,7 @@ def run_single(start_pos, start_z, traj, run_idx):
             }
         },
 
-        "notes": "OpenWater descending run",
+        "notes": "CustomMines descending run",  
     }
 
     run_path = os.path.join(DATASET_ROOT, run_id)
@@ -138,7 +138,7 @@ def run_single(start_pos, start_z, traj, run_idx):
 
     scenario = (
         ScenarioConfig("DatasetRun")
-        .set_world(World.OpenWater)
+        .set_world(World.Example)  
         .add_agent(rov)
     )
 
@@ -180,7 +180,6 @@ def run_single(start_pos, start_z, traj, run_idx):
             pose = parse_pose(last.get("Pose"))
             if pose is None:
                 continue
-
 
             _, y, _ = pose["pos"]
 
@@ -233,11 +232,12 @@ def run_single_with_timeout(start_pos, start_z, traj, run_idx, timeout_sec=RUN_T
     return ("err", "Worker exited without reporting status (possible UE crash)")
 
 def main():
-    # 97
-    run_idx = 97
+    run_idx = 145 
     for z in DEPTHS_Z:
         for start_pos in START_POSITIONS:
             for traj in TRAJECTORIES:
+
+                input(f"[{run_idx:04d}] Pronto per avviare la run (z={z}, traj={traj.name})? Premi INVIO per continuare...")
 
                 attempt = 0
                 while True:
@@ -247,9 +247,9 @@ def main():
 
                     if status == "ok":
                         print(f"[{run_idx:04d}] OK (attempt {attempt})", flush=True)
-                        run_idx += 1          
+                        run_idx += 1
                         time.sleep(1)
-                        break                
+                        break
 
                     print(
                         f"[{run_idx:04d}] FAILED (attempt {attempt}): {status}\n{info}",
@@ -261,4 +261,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
