@@ -179,7 +179,7 @@ def run_single(depth_m: float, start_y: float, traj, run_idx: int):
             writer.write_frame(state, telemetry)
 
     writer.close()
-    print(f"{run_id} completata")
+    print(f"{run_id} Complete")
 
 
 def main():

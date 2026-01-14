@@ -178,7 +178,7 @@ def run_single(depth_m, start_y, traj, run_idx):
     writer.close()
     print(f" {run_id} compelte")
 
-RUN_TIMEOUT_SEC = 200  # ad es. 1.3 minuti per run (scegli tu)
+RUN_TIMEOUT_SEC = 200 
 def _worker_run_single(args, q):
     start_pos, start_z, traj, run_idx = args
     try:

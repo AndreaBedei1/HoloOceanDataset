@@ -217,10 +217,6 @@ def _worker_run_single(args, q):
         q.put(("err", traceback.format_exc()))
 
 def _stdin_listener(out_q: "queue.Queue[str]", stop_evt: threading.Event):
-    """
-    Legge linee da stdin in un thread dedicato e le inoltra su out_q.
-    Funziona ovunque, ma richiede INVIO.
-    """
     while not stop_evt.is_set():
         try:
             line = sys.stdin.readline()
@@ -276,21 +272,27 @@ def run_single_with_timeout_or_manual_kill(start_pos, start_z, traj, run_idx, ti
 
 
 def main():
-    #193
-    run_idx = 193 
+    # 193
+    run_idx = 193
 
     for z in DEPTHS_Z:
         for start_pos in START_POSITIONS:
             for traj in TRAJECTORIES:
 
-                input(f"[{run_idx:04d}] Pronto per avviare la run (z={z}, traj={traj.name})? Premi INVIO per continuare...")
+                input(
+                    f"[{run_idx:04d}] Ready to start the run (z={z}, traj={traj.name})? Press ENTER to continue..."
+                )
 
                 attempt = 0
                 while True:
                     attempt += 1
 
-                    print("Durante la run puoi digitare 'q' + INVIO per interrompere (timeout manuale).")
-                    status, info = run_single_with_timeout_or_manual_kill(start_pos, z, traj, run_idx)
+                    print(
+                        "During the run you can type 'q' + ENTER to interrupt (manual timeout)."
+                    )
+                    status, info = run_single_with_timeout_or_manual_kill(
+                        start_pos, z, traj, run_idx
+                    )
 
                     if status == "ok":
                         print(f"[{run_idx:04d}] OK (attempt {attempt})", flush=True)
@@ -306,5 +308,7 @@ def main():
 
     print("\nDATASET COMPLETE", flush=True)
 
+
 if __name__ == "__main__":
     main()
+

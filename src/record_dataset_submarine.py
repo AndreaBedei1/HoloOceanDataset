@@ -205,7 +205,7 @@ def run_single(start_pos, start_z, traj, run_idx):
 
 
 
-RUN_TIMEOUT_SEC = 90  # ad es. 1.3 minuti per run (scegli tu)
+RUN_TIMEOUT_SEC = 90  
 def _worker_run_single(args, q):
     start_pos, start_z, traj, run_idx = args
     try:
