@@ -10,7 +10,7 @@ cv2.namedWindow("RGB Viewer", cv2.WINDOW_NORMAL)
 for f in files:
     img = cv2.imread(f, cv2.IMREAD_COLOR)
     if img is None:
-        print(f"Errore nel caricare {f}")
+        print(f"Error {f}")
         continue
 
     cv2.imshow("RGB Viewer", img)

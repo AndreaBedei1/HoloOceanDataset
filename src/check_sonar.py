@@ -1,10 +1,11 @@
 import glob
 import time
 import numpy as np
+import os
 from utils.sonar_viz import PolarSonarVisualizerAsync
 
 files = sorted(glob.glob(
-    "dataset/runs/run_0145/sonar_raw/*.npz"
+    "dataset/runs/run_0193/sonar_raw/*.npz"
 ))
 
 viz = PolarSonarVisualizerAsync(
@@ -15,11 +16,30 @@ viz = PolarSonarVisualizerAsync(
     use_cuda=True
 )
 
+text_handle = None  # handle del testo overlay
+
 try:
     for f in files:
         sonar = np.load(f)["intensity"]
+
         viz.submit(sonar)
         viz.update_plot()
-        time.sleep(0.2)
+        image_id = os.path.basename(f)
+
+        if text_handle is None:
+            text_handle = viz.ax.text(
+                0.02, 0.95,
+                image_id,
+                transform=viz.ax.transAxes,
+                color="white",
+                fontsize=10,
+                verticalalignment="top",
+                bbox=dict(facecolor="black", alpha=0.6, pad=3)
+            )
+        else:
+            text_handle.set_text(image_id)
+
+        time.sleep(1)
+
 finally:
     viz.close()
