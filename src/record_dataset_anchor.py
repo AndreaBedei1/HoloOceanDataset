@@ -32,20 +32,21 @@ from utils.trajectories import (
 # ===================== CONFIG =====================
 
 DATASET_ROOT = "dataset/runs"
-OBJECT_CLASS = "mine"  
 
-MAP_NAME = "World.Custom"  
+OBJECT_CLASS = "anchor"  
 
-START_POSITIONS = [
-    (15.0, 43.0, -30.0),
-    (14.0, 43.0, -30.0),
-    (16.0, 43.0, -30.0),
+MAP_NAME = "World.Custom"
+
+START_POSITIONS = [ 
+    (45.0, 45.0, -30.0),
+    (44.0, 45.0, -30.0),
+    (46.0, 45.0, -30.0),
 ]
 
 # [-30.0, -25.0, -20.0, -15.0]
 DEPTHS_Z = [-30.0, -25.0, -20.0, -15.0]
-STOP_Y = -19.16  
-DESCENT_PER_FRAME = 0 
+STOP_Y = -19.16
+DESCENT_PER_FRAME = 0
 
 FRONT_CAM = "FrontCamera"
 BOTTOM_CAM = "SonarCamera"
@@ -124,7 +125,7 @@ def run_single(start_pos, start_z, traj, run_idx):
             }
         },
 
-        "notes": "CustomMines descending run",  
+        "notes": "CustomAnchors run (anchor detection)"  
     }
 
     run_path = os.path.join(DATASET_ROOT, run_id)
@@ -142,7 +143,7 @@ def run_single(start_pos, start_z, traj, run_idx):
 
     scenario = (
         ScenarioConfig("DatasetRun")
-        .set_world(World.Example)  
+        .set_world(World.Example)
         .add_agent(rov)
     )
 
@@ -206,7 +207,7 @@ def run_single(start_pos, start_z, traj, run_idx):
 
 
 
-RUN_TIMEOUT_SEC = 600 
+RUN_TIMEOUT_SEC = 800
 def _worker_run_single(args, q):
     start_pos, start_z, traj, run_idx = args
     try:
@@ -275,8 +276,9 @@ def run_single_with_timeout_or_manual_kill(start_pos, start_z, traj, run_idx, ti
 
 
 def main():
-    # 145
-    run_idx = 145 
+    #193
+    run_idx = 193 
+
     for z in DEPTHS_Z:
         for start_pos in START_POSITIONS:
             for traj in TRAJECTORIES:
@@ -289,7 +291,6 @@ def main():
 
                     print("Durante la run puoi digitare 'q' + INVIO per interrompere (timeout manuale).")
                     status, info = run_single_with_timeout_or_manual_kill(start_pos, z, traj, run_idx)
-
 
                     if status == "ok":
                         print(f"[{run_idx:04d}] OK (attempt {attempt})", flush=True)
