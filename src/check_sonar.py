@@ -3,9 +3,9 @@ import time
 import numpy as np
 import os
 from utils.sonar_viz import PolarSonarVisualizerAsync
-
+#193
 files = sorted(glob.glob(
-    "dataset/runs/run_0193/sonar_raw/*.npz"
+    "dataset/runs/run_0288/sonar_raw/*.npz"
 ))
 
 viz = PolarSonarVisualizerAsync(

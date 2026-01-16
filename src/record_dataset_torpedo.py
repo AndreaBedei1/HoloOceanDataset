@@ -269,7 +269,8 @@ def run_single_with_timeout_or_manual_kill(start_pos, start_z, traj, run_idx, ti
 
 
 def main():
-    run_idx = XXX  # <<< CHANGED: set here the starting run number (e.g., 193, 220, ...)
+    #241
+    run_idx = 241 
 
     for z in DEPTHS_Z:
         for start_pos in START_POSITIONS:
