@@ -111,8 +111,6 @@ class Rover:
                 Sensor.RangeFinder(
                     name="SubRangeFinder",
                     socket="RangeFinder",
-                    # location=[0.0, 0.0, 0.0],
-                    # rotation=[0.0, 0.0, 0.0], 
                     rotation=[0.0, 90.0, 0.0],
                     location=[0.0, 0.0, -0.3],
                     Hz=30,
